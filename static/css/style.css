@@ -1,0 +1,350 @@
+/* ================== PAGE ================== */
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  background: #222;
+  color: #eee;
+  margin: 20px;
+  overflow: hidden;
+}
+
+/* ================== AVATAR BOX ==================
+   Move this div anywhere and resize it however you like.
+   The 3D character automatically fills whatever size it has. */
+#avatar {
+  --width: 1000px;
+  position: fixed;
+  right: -10%;
+  top: 40%;
+  transform: translateX(30%);
+  width: var(--width);
+  height: 100%;
+  overflow: visible;
+  transition: 0.2s;
+  opacity: 0;
+}
+
+#avatar canvas {
+  position: absolute; /* centered on the div, free to extend past its edges */
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none; /* so the oversized canvas doesn't block clicks on other elements */
+}
+
+/* ================== PROMPT AREA ==================
+   Soft glass bar. Colors are variables so you can retheme in one place. */
+/* Wraps the chat history and the prompt bar. Move/resize this to place the chat. */
+.chat-panel {
+  --accent-1: #cdbbff; /* soft lavender */
+  --accent-2: #ffc2d9; /* soft pink */
+  --text: #f3eeff;
+  --glass: rgba(255, 255, 255, 0.07);
+  --glass-hover: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.12);
+
+  position: fixed;
+  z-index: 1;
+  bottom: 24px;
+  left: 100px;
+  width: 40%;
+  min-width: 280px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------- chat history ---------- */
+#chats {
+  flex: 0 1 auto;
+  max-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px 4px 2px; /* top padding leaves room for the fade-out */
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* older messages softly fade out at the top */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
+}
+
+#chats::-webkit-scrollbar {
+  display: none;
+}
+
+.msg {
+  max-width: 85%;
+  box-sizing: border-box;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: msgIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+/* you: lavender, left side */
+.msg.user {
+  align-self: flex-start;
+  border-bottom-left-radius: 6px;
+  background: linear-gradient(
+    135deg,
+    rgba(205, 187, 255, 0.3),
+    rgba(205, 187, 255, 0.15)
+  );
+}
+
+/* her: pink, right side */
+.msg.ai {
+  align-self: flex-end;
+  border-bottom-right-radius: 6px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 194, 217, 0.22),
+    rgba(255, 255, 255, 0.07)
+  );
+}
+
+.msg.error {
+  background: rgba(255, 130, 130, 0.14);
+  border-color: rgba(255, 150, 150, 0.3);
+  color: #ffdede;
+}
+
+/* "she's thinking" dots */
+.msg.typing {
+  display: flex;
+  gap: 5px;
+  padding: 15px 16px;
+}
+
+.msg.typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  opacity: 0.4;
+  animation: typingDot 1.2s ease-in-out infinite;
+}
+
+.msg.typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.msg.typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes msgIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes typingDot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+/* ================== PROMPT BAR ================== */
+.prompt-area {
+  position: relative;
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px 10px 10px 22px;
+  margin: 0;
+
+  border-radius: 28px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* slides up and fades in shortly after the page loads.
+     "backwards" (not "both") so it doesn't override the focus lift below */
+  animation: promptIn 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s backwards;
+  transition:
+    background 0.35s,
+    border-color 0.35s,
+    box-shadow 0.35s,
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.prompt-area:hover {
+  background: var(--glass-hover);
+}
+
+/* glow + gentle lift while typing */
+.prompt-area:focus-within {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(205, 187, 255, 0.55);
+  transform: translateY(-3px);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.3),
+    0 0 0 4px rgba(205, 187, 255, 0.14),
+    0 0 30px rgba(255, 194, 217, 0.16);
+}
+
+@keyframes promptIn {
+  from {
+    opacity: 0;
+    transform: translateY(32px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- text box ---------- */
+.prompt-area textarea {
+  flex: 1;
+  min-height: 28px;
+  max-height: 160px;
+  margin: 0;
+  padding: 8px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  overflow-y: auto;
+
+  color: var(--text);
+  caret-color: var(--accent-2);
+  font: inherit;
+  font-size: 1.05rem;
+  line-height: 1.5;
+
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.prompt-area textarea::placeholder {
+  color: rgba(243, 238, 255, 0.45);
+  transition: opacity 0.3s;
+}
+
+.prompt-area textarea:focus::placeholder {
+  opacity: 0.25;
+}
+
+/* ---------- send button ---------- */
+.prompt-area .send {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+
+  color: #2b2140;
+  font-size: 1.25rem;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  box-shadow: 0 6px 16px rgba(205, 187, 255, 0.3);
+
+  transition:
+    transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1),
+    box-shadow 0.3s,
+    opacity 0.3s,
+    filter 0.3s;
+}
+
+.prompt-area .send ion-icon {
+  transition: transform 0.3s;
+}
+
+.prompt-area .send:hover:not(:disabled) {
+  transform: scale(1.1) rotate(-8deg);
+  box-shadow: 0 8px 22px rgba(255, 194, 217, 0.4);
+}
+
+.prompt-area .send:hover:not(:disabled) ion-icon {
+  transform: translate(2px, -2px);
+}
+
+.prompt-area .send:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+.prompt-area .send:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 3px;
+}
+
+/* empty box -> button looks asleep */
+.prompt-area .send:disabled {
+  opacity: 0.35;
+  filter: saturate(0.4);
+  box-shadow: none;
+  cursor: default;
+}
+
+/* while waiting for the backend, the button softly pulses */
+.prompt-area.sending .send {
+  animation: sendPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes sendPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(205, 187, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(205, 187, 255, 0);
+  }
+}
+
+/* ---------- small screens ---------- */
+@media (max-width: 800px) {
+  .chat-panel {
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+}
+
+/* ---------- respect "reduce motion" system setting ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .prompt-area,
+  .prompt-area .send,
+  .prompt-area .send ion-icon,
+  .msg,
+  .msg.typing span {
+    animation: none !important;
+    transition: none !important;
+  }
+}
