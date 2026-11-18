@@ -1,4 +1,4 @@
-Project: AURA
+Project: MILA
 
 **Setting up ollama**
 1. Install ollama
@@ -18,7 +18,7 @@ ollama run qwen3.5:4b
 **Run instructions**
 1. Clone repository
 ```bash
-git clone <url>
+git clone https://github.com/shohruzbek-1808/aura.git
 ```
 
 2. cd to the directory
