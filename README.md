@@ -10,9 +10,9 @@ ollama serve
 ```
 
 3. Install a model
-This project specifically depends on [qwen3.5:4b](https://ollama.com/library/qwen3.5), however you can put any model by changing MODEL variable to model-name:parameters in app.py:9
+This project defaults to [qwen3:4b](https://ollama.com/library/qwen3). Qwen 3.5 can also be used by setting `AURA_MODEL=qwen3.5:4b` before starting Flask.
 ```bash
-ollama run qwen3.5:4b
+ollama run qwen3:4b
 ```
 
 **Run instructions**

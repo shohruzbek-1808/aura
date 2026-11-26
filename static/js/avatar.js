@@ -11,6 +11,7 @@ const RESET_URL = box.dataset.resetUrl; // Flask /reset route
 
 // Text-to-speech voice. Leave empty to auto-pick a female English voice.
 // To force one, run avatar.listVoices() in the browser console and paste a name here.
+const ENABLE_VOICE = false;
 const VOICE_NAME = "";
 
 const EMOTIONS = ["neutral", "happy", "sad", "angry", "surprised", "relaxed"];
@@ -119,9 +120,11 @@ function flashEmotion(name, ms = 1500) {
 let talking = false;
 function startTalking() {
     talking = true;
+    mouthTimer = 0;
 }
 function stopTalking() {
     talking = false;
+    mouthTimer = 0;
     target.aa = target.ih = target.ou = target.ee = target.oh = 0;
 }
 
@@ -193,7 +196,26 @@ function playAnimation(duration, update, onEnd) {
 // Called every frame from the loop
 function runAnimation() {
     applyRestPose();
-    if (!activeAnim) return;
+    if (!activeAnim) {
+        if (!talking) {
+            const b = bone("chest");
+            if (b) b.rotation.x = Math.sin(clock.elapsedTime * 1.2) * 0.008;
+            const head = bone("head");
+            if (head) {
+                head.rotation.z = Math.sin(clock.elapsedTime * 0.35) * 0.012;
+                head.rotation.x = Math.sin(clock.elapsedTime * 0.6) * 0.006;
+            }
+        } else {
+            const b = bone("chest");
+            if (b) b.rotation.x = Math.sin(clock.elapsedTime * 2.2) * 0.018;
+            const head = bone("head");
+            if (head) {
+                head.rotation.z = Math.sin(clock.elapsedTime * 1.1) * 0.025;
+                head.rotation.x = Math.sin(clock.elapsedTime * 1.7) * 0.012;
+            }
+        }
+        return;
+    }
 
     const t = clock.elapsedTime - activeAnim.start;
     const FADE = 0.5; // seconds to ease in/out
@@ -252,6 +274,25 @@ window.avatar = {
 // ================== ANIMATION LOOP ==================
 const MOUTH = ["aa", "ih", "ou", "ee", "oh"];
 let mouthTimer = 0;
+let visualTalkTimer = null;
+
+function estimateVisualTalkDuration(text) {
+    return Math.min(15000, Math.max(1800, text.length * 65));
+}
+
+function startVisualTalking(text, emotion = "neutral") {
+    stopSpeaking();
+    showEmotion(emotion);
+    if (!text) return;
+
+    startTalking();
+    const duration = estimateVisualTalkDuration(text);
+    visualTalkTimer = setTimeout(() => {
+        stopTalking();
+        visualTalkTimer = null;
+        emotionTimer = setTimeout(() => showEmotion("neutral"), 1200);
+    }, duration);
+}
 
 function animate() {
     requestAnimationFrame(animate);
@@ -323,7 +364,7 @@ function listVoices() {
     return names;
 }
 
-if ("speechSynthesis" in window) {
+if (ENABLE_VOICE && "speechSynthesis" in window) {
     pickVoice();
     speechSynthesis.onvoiceschanged = pickVoice; // voices load late in some browsers
 }
@@ -337,7 +378,10 @@ function stopSpeaking() {
     speechId++;
     clearTimeout(emotionTimer);
     clearTimeout(speechStartTimer);
-    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    clearTimeout(visualTalkTimer);
+    visualTalkTimer = null;
+    activeAnim = null;
+    if (ENABLE_VOICE && "speechSynthesis" in window) speechSynthesis.cancel();
     stopTalking();
 }
 
@@ -357,7 +401,7 @@ function useMouthOnly(id, text, error) {
     clearTimeout(speechStartTimer);
     showSpeechWarning(error);
     const fallbackId = ++speechId;
-    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    if (ENABLE_VOICE && "speechSynthesis" in window) speechSynthesis.cancel();
     startTalking();
     setTimeout(() => {
         if (fallbackId !== speechId) return;
@@ -368,78 +412,8 @@ function useMouthOnly(id, text, error) {
     }, Math.min(15000, Math.max(1200, text.length * 65)));
 }
 
-// Say the text out loud with the emotion on her face, and move her mouth while talking.
-// Example: speak("That's great news!", "happy")
 function speak(text = "", emotion = "neutral") {
-    stopSpeaking();
-    const id = speechId;
-
-    showEmotion(emotion); // set the face from the [tag] the model chose
-    if (!text) return;
-
-    // when finished: stop the mouth, hold the emotion a moment, then relax to neutral
-    const finish = () => {
-        if (id !== speechId) return;
-        clearTimeout(speechStartTimer);
-        stopTalking();
-        clearTimeout(emotionTimer);
-        emotionTimer = setTimeout(() => showEmotion("neutral"), 1200);
-    };
-
-    // Keep the mouth moving even when this browser has no usable speech engine.
-    if (!("speechSynthesis" in window)) {
-        useMouthOnly(id, text, "Speech synthesis is not supported.");
-        return;
-    }
-
-    // speak sentence by sentence (long single utterances get cut off in some browsers)
-    const parts = (text.match(/[^.!?]+[.!?]*/g) || [text])
-        .map((p) => p.trim())
-        .filter(Boolean);
-
-    startTalking();
-    pickVoice();
-
-    const speakPart = (i) => {
-        if (id !== speechId) return;
-        if (i >= parts.length) {
-            finish();
-            return;
-        }
-
-        const u = new SpeechSynthesisUtterance(parts[i]);
-        u.lang = voice ? voice.lang : "en-US";
-        if (voice) u.voice = voice;
-        u.pitch = 1.2; // slightly higher = cheerful
-        u.rate = 1.05;
-        speechStartTimer = setTimeout(
-            () => useMouthOnly(id, text, "Speech playback did not start."),
-            8000,
-        );
-        u.onstart = () => {
-            if (id !== speechId) return;
-            clearTimeout(speechStartTimer);
-        };
-        u.onend = () => {
-            if (id === speechId) speakPart(i + 1);
-        };
-        u.onerror = (event) => {
-            if (id !== speechId) return;
-            if (event.error === "canceled" || event.error === "interrupted") {
-                finish();
-            } else {
-                useMouthOnly(id, text, event.error);
-            }
-        };
-        try {
-            speechSynthesis.resume();
-            speechSynthesis.speak(u);
-        } catch (error) {
-            useMouthOnly(id, text, error);
-        }
-    };
-
-    speakPart(0);
+    startVisualTalking(text, emotion);
 }
 
 // ================== CHAT ==================
