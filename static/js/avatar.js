@@ -37,6 +37,14 @@ const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
 camera.position.set(0, 1.35, 0.7); // camera position: change to zoom in/out
 camera.lookAt(0, 1.3, 0);
 
+const gazeTarget = new THREE.Object3D();
+const desiredGazePosition = new THREE.Vector3();
+const gazeRayPoint = new THREE.Vector3();
+const gazeDirection = new THREE.Vector3();
+const pointerHeadTarget = { x: 0, y: 0, z: 0 };
+const pointerHeadOffset = { x: 0, y: 0, z: 0 };
+scene.add(gazeTarget);
+
 const light = new THREE.DirectionalLight(0xffffff, Math.PI);
 light.position.set(1, 1, 1);
 scene.add(light);
@@ -74,6 +82,7 @@ loader.load(
         vrm.scene.traverse((o) => (o.frustumCulled = false));
         scene.add(vrm.scene);
         vrm.scene.rotation.y = THREE.MathUtils.degToRad(-10);
+        if (vrm.lookAt) vrm.lookAt.target = gazeTarget;
 
         setTimeout(() => {
             box.style.opacity = 1;
@@ -99,9 +108,23 @@ function setExpression(name, value = 1) {
 // Clear every face expression, then apply the chosen look.
 // Uses your PRESETS if one exists, otherwise just turns that emotion fully on.
 function showEmotion(name) {
+    if (name === "happy") {
+        name = "relaxed"; // happy is too extreme for a normal conversation
+    }
     FACE_KEYS.forEach((e) => (target[e] = 0));
     const look = PRESETS[name] || { [name]: 1 };
     Object.assign(target, look);
+    setProjectMood(name);
+}
+
+const projectMood = document.getElementById("project-mood");
+const projectMoodRow = document.querySelector(".project-mood");
+
+function setProjectMood(name) {
+    const normalizedName = EMOTIONS.includes(name) ? name : "neutral";
+    projectMood.textContent =
+        normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1);
+    projectMoodRow.dataset.mood = normalizedName;
 }
 
 // Back to a neutral face
@@ -137,14 +160,41 @@ function blinkNow() {
 
 // ---------- Looking around ----------
 function look(direction) {
-    // 'left' | 'right' | 'up' | 'down' | 'center'
-    ["lookLeft", "lookRight", "lookUp", "lookDown"].forEach(
-        (e) => (target[e] = 0),
-    );
-    if (direction !== "center") {
-        target["look" + direction[0].toUpperCase() + direction.slice(1)] = 0.8;
-    }
+    const directions = {
+        left: [-0.7, 0],
+        right: [0.7, 0],
+        up: [0, 0.7],
+        down: [0, -0.7],
+        center: [0, 0],
+    };
+    const [x, y] = directions[direction] || directions.center;
+    setGazeTarget(x, y);
 }
+
+function setGazeTarget(x, y) {
+    gazeRayPoint.set(x, y, 0.5).unproject(camera);
+    gazeDirection.copy(gazeRayPoint).sub(camera.position).normalize();
+    desiredGazePosition
+        .copy(camera.position)
+        .addScaledVector(gazeDirection, 0.45);
+}
+
+function lookAtPointer(event) {
+    const bounds = renderer.domElement.getBoundingClientRect();
+    const x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+    const y = 1 - ((event.clientY - bounds.top) / bounds.height) * 2;
+    setGazeTarget(x, y);
+
+    const horizontal = THREE.MathUtils.clamp(x, -1, 1);
+    const vertical = THREE.MathUtils.clamp(y, -1, 1);
+    pointerHeadTarget.x = -vertical * 0.035;
+    pointerHeadTarget.y = horizontal * 0.075;
+    pointerHeadTarget.z = -horizontal * 0.055;
+}
+
+window.addEventListener("pointermove", lookAtPointer);
+setGazeTarget(0, 0);
+gazeTarget.position.copy(desiredGazePosition);
 
 // ================== BODY ANIMATION ==================
 // The model starts in a T-pose. REST is the pose she returns to (arms down).
@@ -300,6 +350,11 @@ function animate() {
     const t = clock.elapsedTime;
 
     if (vrm) {
+        gazeTarget.position.lerp(
+            desiredGazePosition,
+            Math.min(1, dt * 10),
+        );
+
         // auto blink every 2-5 seconds
         if (t > nextBlink) {
             blinkNow();
@@ -326,6 +381,18 @@ function animate() {
         }
 
         runAnimation(); // body pose / animation
+
+        const head = bone("head");
+        if (head) {
+            const blend = Math.min(1, dt * 5);
+            pointerHeadOffset.x += (pointerHeadTarget.x - pointerHeadOffset.x) * blend;
+            pointerHeadOffset.y += (pointerHeadTarget.y - pointerHeadOffset.y) * blend;
+            pointerHeadOffset.z += (pointerHeadTarget.z - pointerHeadOffset.z) * blend;
+            head.rotation.x += pointerHeadOffset.x;
+            head.rotation.y += pointerHeadOffset.y;
+            head.rotation.z += pointerHeadOffset.z;
+        }
+
         vrm.update(dt);
     }
     renderer.render(scene, camera);

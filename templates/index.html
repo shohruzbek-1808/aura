@@ -24,6 +24,16 @@
   </head>
 
   <body>
+    <header class="project-header" aria-label="Project">
+      <div class="project-name">Mila</div>
+      <div class="project-mood" data-mood="neutral">
+        <span class="mood-dot" aria-hidden="true"></span>
+        <span id="project-mood">Neutral</span>
+      </div>
+    </header>
+
+    <canvas id="snow" aria-hidden="true"></canvas>
+
     <!-- The character lives in here. The JS reads the model and chat URLs from these data attributes. -->
     <div
       id="avatar"
@@ -54,6 +64,10 @@
     <script
       type="module"
       src="{{ url_for('static', filename='js/avatar.js') }}"
+    ></script>
+    <script
+      type="module"
+      src="{{ url_for('static', filename='js/snow.js') }}"
     ></script>
 
     <script
