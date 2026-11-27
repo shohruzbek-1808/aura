@@ -117,6 +117,12 @@ body {
   pointer-events: none; /* so the oversized canvas doesn't block clicks on other elements */
 }
 
+/* Keep mobile devices away from the continuously rendered 3D canvas. */
+.mobile-lite #avatar,
+.mobile-lite #snow {
+  display: none;
+}
+
 /* ================== PROMPT AREA ==================
    Soft glass bar. Colors are variables so you can retheme in one place. */
 /* Wraps the chat history and the prompt bar. Move/resize this to place the chat. */

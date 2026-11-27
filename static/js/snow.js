@@ -1,5 +1,17 @@
 const canvas = document.getElementById("snow");
-const context = canvas.getContext("2d");
+const isMobileDevice = window.matchMedia(
+    "(max-width: 800px), (pointer: coarse)",
+).matches;
+const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+).matches;
+const context =
+    isMobileDevice || prefersReducedMotion ? null : canvas.getContext("2d");
+
+if (!context) {
+    canvas.hidden = true;
+}
+
 const prompt = document.querySelector(".prompt-area");
 
 let width = 0;
@@ -19,6 +31,7 @@ function createFlake() {
 }
 
 function resize() {
+    if (!context) return;
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
     width = window.innerWidth;
     height = window.innerHeight;
@@ -31,6 +44,7 @@ function resize() {
 }
 
 function draw(timestamp) {
+    if (!context) return;
     const delta = Math.min((timestamp - lastFrame) / 1000 || 0, 0.05);
     lastFrame = timestamp;
     context.clearRect(0, 0, width, height);
@@ -62,6 +76,8 @@ function draw(timestamp) {
     requestAnimationFrame(draw);
 }
 
-window.addEventListener("resize", resize);
-resize();
-requestAnimationFrame(draw);
+if (context) {
+    window.addEventListener("resize", resize);
+    resize();
+    requestAnimationFrame(draw);
+}

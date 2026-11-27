@@ -8,6 +8,13 @@ const MODEL_FILE = box.dataset.model; // set in index.html with url_for(...)
 const CHAT_URL = box.dataset.chatUrl; // Flask /chat route
 const HISTORY_URL = box.dataset.historyUrl; // Flask /history route
 const RESET_URL = box.dataset.resetUrl; // Flask /reset route
+const isMobileDevice = window.matchMedia(
+    "(max-width: 800px), (pointer: coarse)",
+).matches;
+
+if (isMobileDevice) {
+    document.body.classList.add("mobile-lite");
+}
 
 // Text-to-speech voice. Leave empty to auto-pick a female English voice.
 // To force one, run avatar.listVoices() in the browser console and paste a name here.
@@ -28,9 +35,13 @@ const FACE_KEYS = [...EMOTIONS, "aa", "ih", "ou", "ee", "oh"];
 // ================== SCENE SETUP ==================
 const clock = new THREE.Clock();
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-box.appendChild(renderer.domElement);
+const renderer = isMobileDevice
+    ? null
+    : new THREE.WebGLRenderer({ antialias: true, alpha: true });
+if (renderer) {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    box.appendChild(renderer.domElement);
+}
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
@@ -53,6 +64,7 @@ scene.add(new THREE.AmbientLight(0xff0000, 0.6));
 const EXTRA = 3; // canvas is 3x the div's size. Bigger = more room to overflow
 
 function resize() {
+    if (!renderer) return;
     const w = box.clientWidth * EXTRA;
     const h = box.clientHeight * EXTRA;
     renderer.setSize(w, h);
@@ -74,25 +86,27 @@ let vrm = null;
 const loader = new GLTFLoader();
 loader.register((parser) => new VRMLoaderPlugin(parser));
 
-loader.load(
-    MODEL_FILE,
-    (gltf) => {
-        vrm = gltf.userData.vrm;
-        VRMUtils.rotateVRM0(vrm);
-        vrm.scene.traverse((o) => (o.frustumCulled = false));
-        scene.add(vrm.scene);
-        vrm.scene.rotation.y = THREE.MathUtils.degToRad(-10);
-        if (vrm.lookAt) vrm.lookAt.target = gazeTarget;
+if (!isMobileDevice) {
+    loader.load(
+        MODEL_FILE,
+        (gltf) => {
+            vrm = gltf.userData.vrm;
+            VRMUtils.rotateVRM0(vrm);
+            vrm.scene.traverse((o) => (o.frustumCulled = false));
+            scene.add(vrm.scene);
+            vrm.scene.rotation.y = THREE.MathUtils.degToRad(-10);
+            if (vrm.lookAt) vrm.lookAt.target = gazeTarget;
 
-        setTimeout(() => {
-            box.style.opacity = 1;
-            box.style.right = "0";
-        }, 1000);
-        setTimeout(waveHello, 1500);
-    },
-    undefined,
-    (err) => console.error("Could not load model from " + MODEL_FILE, err),
-);
+            setTimeout(() => {
+                box.style.opacity = 1;
+                box.style.right = "0";
+            }, 1000);
+            setTimeout(waveHello, 1500);
+        },
+        undefined,
+        (err) => console.error("Could not load model from " + MODEL_FILE, err),
+    );
+}
 
 // ================== FACE CONTROL FUNCTIONS ==================
 
@@ -180,6 +194,7 @@ function setGazeTarget(x, y) {
 }
 
 function lookAtPointer(event) {
+    if (!renderer) return;
     const bounds = renderer.domElement.getBoundingClientRect();
     const x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
     const y = 1 - ((event.clientY - bounds.top) / bounds.height) * 2;
@@ -397,7 +412,7 @@ function animate() {
     }
     renderer.render(scene, camera);
 }
-animate();
+if (renderer) animate();
 
 // ================== TEXT TO SPEECH ==================
 // Uses the browser's built-in voices (no extra install needed).
